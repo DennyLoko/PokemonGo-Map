@@ -33,6 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
  && apt-get install -y --no-install-recommends nodejs \
  && npm install \
  && npm run build \
+ && node ./node_modules/grunt-cli/bin/grunt build \
  && rm -rf node_modules \
  && apt-get purge -y --auto-remove build-essential nodejs \
  && rm -rf /var/lib/apt/lists/*
