@@ -32,6 +32,7 @@ from .utils import get_pokemon_name, get_pokemon_rarity, get_pokemon_types, \
     get_move_name, get_move_damage, get_move_energy, get_move_type
 from .transform import transform_from_wgs_to_gcj, get_new_coords
 from .customLog import printPokemon
+
 log = logging.getLogger(__name__)
 
 args = get_args()
@@ -1847,6 +1848,43 @@ class Token(flaskDb.Model):
         return tokens
 
 
+class HashKeys(BaseModel):
+    key = CharField(primary_key=True, max_length=20)
+    maximum = IntegerField(default=0)
+    peak = IntegerField(default=0)
+    expires = DateTimeField(null=True)
+    last_updated = DateTimeField(default=datetime.utcnow)
+
+    @staticmethod
+    def db_format(hashkey, name='hashkey_db'):
+        return {'key': hashkey['key'],
+                'maximum': hashkey['maximum'],
+                'peak': hashkey['peak'],
+                'expires': hashkey['expires'],
+                'last_updated': datetime.utcnow()
+                }
+
+    @staticmethod
+    def get_by_key(key):
+        query = (HashKeys
+                 .select()
+                 .where(HashKeys.key == key)
+                 .dicts())
+
+        return query[0] if query else {
+            'maximum': 0,
+            'peak': 0,
+            'expires': None,
+            'last_updated': None
+        }
+
+        hashkey = []
+        for s in query:
+            hashkey.append(s)
+
+        return hashkey
+
+
 def hex_bounds(center, steps=None, radius=None):
     # Make a box that is (70m * step_limit * 2) + 70m away from the
     # center point.  Rationale is that you need to travel.
@@ -2463,6 +2501,13 @@ def clean_db_loop(args):
                              (datetime.utcnow() - timedelta(minutes=2)))))
             query.execute()
 
+            # Remove expired HashKeys
+            query = (HashKeys
+                     .delete()
+                     .where(HashKeys.expires <
+                            (datetime.utcnow() - timedelta(days=1))))
+            query.execute()
+
             # If desired, clear old Pokemon spawns.
             if args.purge_data > 0:
                 query = (Pokemon
@@ -2533,7 +2578,7 @@ def create_tables(db):
     db.create_tables([Pokemon, Pokestop, Gym, ScannedLocation, GymDetails,
                       GymMember, GymPokemon, Trainer, MainWorker, WorkerStatus,
                       SpawnPoint, ScanSpawnPoint, SpawnpointDetectionData,
-                      Token, LocationAltitude, Account, BadScans], safe=True)
+                      Token, LocationAltitude, Account, BadScans, HashKeys], safe=True)
     db.close()
 
 
@@ -2543,7 +2588,7 @@ def drop_tables(db):
                     GymDetails, GymMember, GymPokemon, Trainer, MainWorker,
                     WorkerStatus, SpawnPoint, ScanSpawnPoint,
                     SpawnpointDetectionData, LocationAltitude,
-                    Token, Account, BadScans], safe=True)
+                    Token, Account, BadScans, Versions, HashKeys], safe=True)
     db.close()
 
 
